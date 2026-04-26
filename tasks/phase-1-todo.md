@@ -119,9 +119,9 @@
 - Tests cover round-trip and rejection paths.
 
 **Acceptance:**
-- [ ] `pnpm test update-calendar` passes
-- [ ] Two-tool round-trip works: `update_calendar` → `apply_calendar_update` → commit lands
-- [ ] Expired token returns clear error message
+- [x] `pnpm test update-calendar` passes (15/15)
+- [x] Two-tool round-trip works: `update_calendar` → `apply_calendar_update` → commit lands
+- [x] Expired token returns clear error message
 
 **Commit:** `Add update_calendar review-then-commit flow`
 

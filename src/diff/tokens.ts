@@ -1,39 +1,39 @@
-// Short-lived token store for the review-then-commit flow (Q1).
-// `update_calendar` stashes a diff under a fresh token and returns it
-// to the LLM; `apply_calendar_update` consumes the token to commit.
-// Tokens are one-shot — consume() removes the entry — and expire after
-// `ttlMs` to avoid stale diffs lingering in memory.
+// Short-lived generic token store for review-then-commit flows (Q1).
+// `update_calendar` stashes a value under a fresh token; the matching
+// `apply_*` tool consumes the token to commit. Tokens are one-shot
+// (consume() removes the entry) and expire after `ttlMs` to avoid
+// stale state lingering in memory. Generic over the value type so
+// each consumer can stash whatever shape it needs.
 
 import { randomUUID } from "node:crypto";
-import type { CalendarDiff, PendingDiff } from "./types.js";
 
 export const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
-export class TokenStore {
-  private readonly store = new Map<string, PendingDiff>();
+interface Entry<T> {
+  value: T;
+  expiresAt: number;
+}
+
+export class TokenStore<T> {
+  private readonly store = new Map<string, Entry<T>>();
   private readonly ttlMs: number;
 
   constructor(ttlMs: number = DEFAULT_TTL_MS) {
     this.ttlMs = ttlMs;
   }
 
-  put(
-    calendarId: string,
-    diff: CalendarDiff,
-    now: number = Date.now(),
-  ): string {
+  put(value: T, now: number = Date.now()): string {
     const token = randomUUID();
     this.store.set(token, {
-      calendarId,
-      diff,
+      value,
       expiresAt: now + this.ttlMs,
     });
     return token;
   }
 
-  // Returns the entry if present and unexpired, then removes it
+  // Returns the value if present and unexpired, then removes it
   // (one-shot semantics). Returns null on missing or expired tokens.
-  consume(token: string, now: number = Date.now()): PendingDiff | null {
+  consume(token: string, now: number = Date.now()): T | null {
     const entry = this.store.get(token);
     if (!entry) return null;
     if (now > entry.expiresAt) {
@@ -41,7 +41,7 @@ export class TokenStore {
       return null;
     }
     this.store.delete(token);
-    return entry;
+    return entry.value;
   }
 
   // Best-effort sweep of expired entries. Safe to call periodically

@@ -41,10 +41,3 @@ export interface CalendarDiff {
   // True when there's nothing to commit (no adds, removes, or updates).
   isNoop: boolean;
 }
-
-export interface PendingDiff {
-  calendarId: string;
-  diff: CalendarDiff;
-  // Unix-ms when the entry expires.
-  expiresAt: number;
-}

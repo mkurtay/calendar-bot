@@ -17,10 +17,22 @@ import {
   createCalendar,
   type CreateCalendarParams,
 } from "./tools/create-calendar.js";
+import {
+  UPDATE_CALENDAR_TOOL,
+  updateCalendar,
+  type UpdateCalendarParams,
+} from "./tools/update-calendar.js";
+import {
+  APPLY_CALENDAR_UPDATE_TOOL,
+  applyCalendarUpdate,
+  type ApplyCalendarUpdateParams,
+} from "./tools/apply-calendar-update.js";
 import { ConfigError, loadConfig } from "./config.js";
 
 const TOOL_DEFINITIONS = [
   CREATE_CALENDAR_TOOL,
+  UPDATE_CALENDAR_TOOL,
+  APPLY_CALENDAR_UPDATE_TOOL,
   {
     name: "list_calendars",
     description:
@@ -201,6 +213,13 @@ async function dispatch(
   switch (name) {
     case "create_calendar":
       return createCalendar(store, args as unknown as CreateCalendarParams);
+    case "update_calendar":
+      return updateCalendar(store, args as unknown as UpdateCalendarParams);
+    case "apply_calendar_update":
+      return applyCalendarUpdate(
+        store,
+        args as unknown as ApplyCalendarUpdateParams,
+      );
     case "list_calendars":
       return tools.listCalendars(store);
     case "list_events":
