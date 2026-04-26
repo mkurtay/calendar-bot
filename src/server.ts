@@ -73,7 +73,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "add_event",
     description:
-      "Add a new event to a calendar. Produces a real commit on mkurtay/kurtays-calendar; CI then renders & deploys. Generates a UID if not provided. The typed_block parameter carries sport-specific fields like soccer.{home, away, stage, group, leg} or formula1.{round, gp_name, circuit, city, country, session, is_sprint_weekend}.",
+      "(advanced — prefer update_calendar for bulk changes) Add a single event to an existing calendar. Produces a real commit on mkurtay/kurtays-calendar; CI then renders & deploys. Generates a UID if not provided. The typed_block parameter carries sport-specific fields like soccer.{home, away, stage, group, leg} or formula1.{round, gp_name, circuit, city, country, session, is_sprint_weekend}. Use update_calendar instead when adding multiple events at once or when refreshing a calendar against a new fixture list.",
     inputSchema: {
       type: "object",
       properties: {
@@ -123,7 +123,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "update_event",
     description:
-      "Update one or more fields of an existing event. The patch object is shallow-merged into the event (top-level fields replaced, nested objects replaced wholesale). Use list_events first to find the UID.",
+      "(advanced — prefer update_calendar for bulk changes) Update one or more fields of a single existing event. The patch object is shallow-merged into the event (top-level fields replaced, nested objects replaced wholesale). Use list_events first to find the UID. Prefer update_calendar when the source data has more than a handful of changes — its merge policy preserves local results and local_only events automatically.",
     inputSchema: {
       type: "object",
       properties: {
@@ -141,7 +141,8 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "remove_event",
-    description: "Remove an event from a calendar.",
+    description:
+      "(advanced — prefer update_calendar for bulk changes) Remove a single event from a calendar by UID. For removing many events at once (e.g. after a tournament reformat), use update_calendar with the desired event list — events missing from that list are detected as removals automatically.",
     inputSchema: {
       type: "object",
       properties: {
@@ -155,7 +156,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "set_result",
     description:
-      "Record the result of a completed event and (by default) mark its status as 'completed'. The result object is sport-appropriate: soccer might be { home_score: 2, away_score: 1, notes: '...' }; F1 might be { winner_driver: '...', winner_team: '...', podium: [...] }.",
+      "(advanced — granular tool for setting a single event's result) Record the result of a completed event and (by default) mark its status as 'completed'. The result object is sport-appropriate: soccer might be { home_score: 2, away_score: 1, notes: '...' }; F1 might be { winner_driver: '...', winner_team: '...', podium: [...] }. Once set, the result is preserved across subsequent update_calendar runs (local result wins by policy).",
     inputSchema: {
       type: "object",
       properties: {

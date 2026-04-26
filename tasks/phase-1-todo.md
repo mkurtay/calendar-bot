@@ -136,8 +136,8 @@
 - No behavior change.
 
 **Acceptance:**
-- [ ] `pnpm typecheck` clean
-- [ ] Manual smoke test: Claude Desktop tool list shows updated descriptions
+- [x] `pnpm typecheck` clean
+- [ ] Manual smoke test: Claude Desktop tool list shows updated descriptions *(user-side; pending after Claude Desktop restart)*
 
 **Commit:** `Nudge LLMs toward high-level calendar tools in descriptions`
 
