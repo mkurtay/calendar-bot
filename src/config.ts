@@ -26,9 +26,7 @@ export const processEnvSource: ConfigSource = {
 export function loadConfig(source: ConfigSource = processEnvSource): Config {
   const token = source.get("GITHUB_TOKEN");
   if (!token) {
-    throw new ConfigError(
-      "GITHUB_TOKEN env var required. See .env.example for details.",
-    );
+    throw new ConfigError("GITHUB_TOKEN env var required. See .env.example for details.");
   }
   return {
     github: {

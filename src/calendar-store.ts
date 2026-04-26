@@ -48,9 +48,7 @@ export class CalendarStore {
       jsons.map(async ({ path }) => {
         const { content } = await this.gh.getFile(path);
         const cal = JSON.parse(content) as Calendar;
-        const upcoming = cal.events.filter(
-          (e) => new Date(e.end) >= now,
-        ).length;
+        const upcoming = cal.events.filter((e) => new Date(e.end) >= now).length;
         return {
           id: cal.id,
           name: cal.name,
@@ -58,23 +56,17 @@ export class CalendarStore {
           event_count: cal.events.length,
           upcoming_count: upcoming,
         };
-      }),
+      })
     );
   }
 
-  async getCalendar(
-    id: string,
-  ): Promise<{ calendar: Calendar; sha: string; path: string }> {
+  async getCalendar(id: string): Promise<{ calendar: Calendar; sha: string; path: string }> {
     const path = `data/${id}.json`;
     const { content, sha } = await this.gh.getFile(path);
     return { calendar: JSON.parse(content) as Calendar, sha, path };
   }
 
-  async saveCalendar(
-    calendar: Calendar,
-    sha: string,
-    message: string,
-  ): Promise<{ sha: string; commitUrl: string }> {
+  async saveCalendar(calendar: Calendar, sha: string, message: string): Promise<{ sha: string; commitUrl: string }> {
     const path = `data/${calendar.id}.json`;
     const content = JSON.stringify(calendar, null, 2) + "\n";
     return this.gh.putFile({ path, content, sha, message });
