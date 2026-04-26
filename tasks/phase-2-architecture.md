@@ -46,82 +46,19 @@ they're carried forward unchanged.
 
 ---
 
-## Open questions (need answers before implementation)
+## Locked answers (Q1–Q5)
 
-These are the equivalent of Phase 1's Q1–Q5 — defer-to-implementation
-decisions that meaningfully shape the architecture:
+These five decisions shape the architecture. They were debated during
+Phase 2 design and are now locked; revisit only if implementation
+surfaces a real problem with one of them.
 
-### Q1: Provider registration
-
-When `update_calendar("ucl-2026")` runs auto-fetch, how does it pick
-the provider?
-
-| | (i) Explicit per-calendar map | (ii) Rule-based via `canServe()` |
+| # | Decision | Locked answer |
 |---|---|---|
-| **How** | `PROVIDERS.set("ucl-2026", footballDataUCL)` at module load | Each provider implements `canServe(calendar)`; iterate to find a match |
-| **Pros** | Trivial to reason about; no conflicts | Adapts to new calendars without code change |
-| **Cons** | Every new calendar needs a code change | Edge cases: which provider wins if two match? |
-
-**Lean: (i) explicit per-calendar map.** Calendars are added rarely
-enough (a few per year) that the per-calendar map's friction is a
-feature — it forces explicit choice.
-
-### Q2: API token handling
-
-The football-data providers need a `FOOTBALL_DATA_TOKEN`. jolpica
-doesn't need anything. How do we model "this provider needs auth"?
-
-| | (i) Required env var, fail fast | (ii) Optional env var, fall back to error at fetch time |
-|---|---|---|
-| **Behavior on startup with no token** | Server fails to start | Server starts; fetch errors with "set FOOTBALL_DATA_TOKEN" |
-| **Pros** | Catches misconfiguration immediately | Lets you use F1 even if you haven't set up the soccer token yet |
-| **Cons** | Mixed-category users (F1 only) blocked unnecessarily | Failure deferred to first soccer fetch |
-
-**Lean: (ii) optional + fail at fetch time.** Aligns with how the GitHub
-PAT works (required only when you actually mutate); separates "server
-healthy" from "every provider is configured."
-
-### Q3: Caching
-
-Provider responses are cacheable but external services have rate limits.
-Where does cache live?
-
-| | (i) None | (ii) In-memory per server lifetime | (iii) On-disk (e.g. `.cache/`) |
-|---|---|---|---|
-| **Risk of rate-limit hit** | High | Low (cache survives within session) | Lowest (cache survives restart) |
-| **Implementation cost** | $0 | ~50 LOC | ~150 LOC + cleanup logic |
-| **Staleness window** | None | TTL'd | TTL'd |
-
-**Lean: (ii) in-memory.** football-data's 10 req/min is plenty for
-manual use. ETag is a nice-to-have for Phase 2.1; basic in-memory TTL
-cache is fine.
-
-### Q4: Auto-fetch on `create_calendar`?
-
-Phase 1's `create_calendar` requires the user to pass events. Should
-Phase 2 add a no-events variant that auto-fetches?
-
-| | (i) Yes — auto-fetch initial event list | (ii) No — keep `create_calendar` requiring events |
-|---|---|---|
-| **What enables it** | A topic-or-id to provider mapping for new calendars | n/a — user dictates explicitly |
-| **Friction** | Low: "create me a UCL 2026 calendar" → done | Medium: user has to first list events somewhere |
-| **Risk** | Provider might have nothing yet (e.g. WC pre-draw) — partial-fixture starts | n/a |
-
-**Lean: (i) yes, with a graceful empty-events case.** If the provider
-returns nothing yet (pre-draw), the calendar is created empty and
-`update_calendar` is what populates it later. Worth doing in Phase 2.
-
-### Q5: F1 results polling
-
-F1 results post within hours of a race. Who triggers the refresh?
-
-| | (i) Manual: user runs `update_calendar` | (ii) Auto: scheduled GitHub Action |
-|---|---|---|
-| **Cost** | $0 | A daily/hourly Action against jolpica's free tier |
-| **Latency** | "I want to update results" → manual call | Within an hour of a race |
-
-**Lean: (i) manual for Phase 2.** Phase 3+ adds a scheduled refresh
-once we have HTTP transport + a Lambda to run it.
+| Q1 | Provider registration | **Explicit per-calendar map.** `src/fetchers/registry.ts` holds a `Map<calendarId, FixtureProvider>`. Adding a calendar = adding one line. No runtime mapping or `canServe()` discovery. |
+| Q2 | API token handling | **Optional env vars; fail at fetch time.** Server boots even without `FOOTBALL_DATA_TOKEN`. Soccer auto-fetches fail with a clear *"Set FOOTBALL_DATA_TOKEN env var"* message; F1 (no token needed) still works. Manual operations (explicit-events tools) all still work. |
+| Q3 | Caching | **In-memory per server lifetime.** Simple TTL cache (~5–10 minutes) keyed by competition + season. No disk persistence; rebuilds fresh on each Claude Desktop launch. ETag-aware caching deferred to Phase 2.1 if rate limits become a problem. |
+| Q4 | Auto-fetch on `create_calendar` | **Yes, with graceful empty fallback.** When `events` is omitted, the tool resolves a provider, fetches initial fixtures, and scaffolds the calendar. If the provider returns nothing (e.g. WC 2026 pre-December-2025 draw), the calendar is created empty and the user populates it later via `update_calendar`. |
+| Q5 | F1 results polling / scheduled refresh | **Manual only for Phase 2.** Refresh happens when the user says *"refresh F1"* (or any other category) in Claude Desktop. No scheduled GitHub Action — that would conflict with Phase 1's review-then-commit policy. Phase 2.5 may add scheduled *notifications* (not commits) as an opt-in layer; Phase 3+ revisits scheduling once HTTP transport is in place. |
 
 ---
 
@@ -194,7 +131,7 @@ const PROVIDERS = new Map<string, FixtureProvider>([
 ```
 
 When a new calendar is added, the registry gets one new line. The
-provider modules don't change. (Q1 lean.)
+provider modules don't change. (Q1 locked.)
 
 ### 3. Auto-fetch is opt-in via omitted `events`
 
@@ -282,7 +219,7 @@ Each step ends in a commit. Acceptance per step.
 
 - **Standings tables, leg aggregate scores, championship charts** — kurtays-calendar renderer extension, Phase 4.
 - **Scheduled auto-refresh** — needs HTTP transport + Lambda; Phase 3+.
-- **Disk-persisted cache** — in-memory only (Q3 lean).
+- **Disk-persisted cache** — in-memory only (Q3 locked).
 - **api-football.com fallback** — defer to Phase 2.1 if rate limits become a real problem.
 - **F1 results enrichment via openf1.org** — defer to Phase 4 alongside richer renderer.
 - **Cross-competition diffs** (e.g. "is this team in both UCL and WC?") — out of scope.
@@ -305,7 +242,7 @@ Each step ends in a commit. Acceptance per step.
 
 ## Estimated effort
 
-Roughly **6-8 hours of focused work**, modulo answers to Q1–Q5:
+Roughly **6-8 hours of focused work** with all decisions locked:
 
 - Steps 1–3 (provider scaffolding + first soccer adapter): ~3 hours
 - Step 4 (auto-fetch wiring): ~1 hour (small change against existing tools)
