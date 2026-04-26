@@ -12,6 +12,7 @@ import {
 import { GitHub } from "./github.js";
 import { CalendarStore } from "./calendar-store.js";
 import * as tools from "./tools.js";
+import { ConfigError, loadConfig } from "./config.js";
 
 const TOOL_DEFINITIONS = [
   {
@@ -210,19 +211,8 @@ async function dispatch(
 }
 
 async function main() {
-  const token = process.env["GITHUB_TOKEN"];
-  if (!token) {
-    console.error(
-      "GITHUB_TOKEN env var required. See .env.example for details.",
-    );
-    process.exit(1);
-  }
-  const gh = new GitHub({
-    owner: process.env["GITHUB_OWNER"] ?? "mkurtay",
-    repo: process.env["GITHUB_REPO"] ?? "kurtays-calendar",
-    branch: process.env["GITHUB_BRANCH"] ?? "main",
-    token,
-  });
+  const config = loadConfig();
+  const gh = new GitHub(config.github);
   const store = new CalendarStore(gh);
   const mcp = createServer(store);
   const transport = new StdioServerTransport();
@@ -230,6 +220,10 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("MCP server crashed:", err);
+  if (err instanceof ConfigError) {
+    console.error(err.message);
+  } else {
+    console.error("MCP server crashed:", err);
+  }
   process.exit(1);
 });
