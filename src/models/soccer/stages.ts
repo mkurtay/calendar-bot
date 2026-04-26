@@ -4,8 +4,14 @@
 // validators) can rely on.
 
 export type SoccerStage =
+  // Group stage of group-phase cups (e.g. World Cup).
   | "Group"
+  // League stage of Swiss-system cups (e.g. UCL 2024-25+).
   | "LeaguePhase"
+  // Pure league competitions (e.g. Premier League, Süper Lig).
+  // Distinct from LeaguePhase to keep the renderer's type→layout
+  // dispatch unambiguous.
+  | "LeaguePlay"
   | "R32"
   | "R16"
   | "Quarterfinal"
@@ -16,6 +22,7 @@ export type SoccerStage =
 export const stageOrder: readonly SoccerStage[] = [
   "Group",
   "LeaguePhase",
+  "LeaguePlay",
   "R32",
   "R16",
   "Quarterfinal",
@@ -56,6 +63,11 @@ const STAGE_ALIASES = new Map<string, SoccerStage>([
   ["Group Stage", "Group"],
   ["League Stage", "LeaguePhase"],
   ["League Phase", "LeaguePhase"],
+  // Pure-league aliases. Per-round identification (matchweek number)
+  // belongs in event.soccer.matchday, not in the stage value itself.
+  ["League Play", "LeaguePlay"],
+  ["REGULAR_SEASON", "LeaguePlay"],
+  ["Regular Season", "LeaguePlay"],
   ["Round of 32", "R32"],
   ["Round of 16", "R16"],
   ["Quarter-finals", "Quarterfinal"],

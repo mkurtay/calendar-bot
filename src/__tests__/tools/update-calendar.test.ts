@@ -113,7 +113,7 @@ describe("updateCalendar", () => {
     };
     await expect(
       updateCalendar(store, { id: "ucl-2026", events: [malformed] }),
-    ).rejects.toThrow(/Invalid events for category "soccer"/);
+    ).rejects.toThrow(/Invalid (events|calendar) for category "soccer"/);
   });
 
   it("rejects empty id", async () => {
@@ -269,5 +269,124 @@ describe("update_calendar + apply_calendar_update merge policy round-trip", () =
     const applied = await applyCalendarUpdate(store, { token: upd.token });
     expect(applied.is_noop).toBe(true);
     expect(saved).toHaveLength(0);
+  });
+});
+
+describe("update_calendar — teams[] tracking", () => {
+  function leagueSeed(
+    teams: Array<{ id: string; name: string }>,
+    events: ReturnType<typeof soccerEvent>[] = [],
+  ): Calendar {
+    const cal: Calendar = {
+      id: "ucl-2026",
+      name: "UCL 2026",
+      category: "soccer",
+      html_file: "ucl-2026.html",
+      ics: { prodid: "-//x//EN", calscale: "GREGORIAN", method: "PUBLISH" },
+      events,
+    };
+    (cal as Record<string, unknown>).teams = teams;
+    return cal;
+  }
+
+  it("reports added/removed/renamed teams in teams_diff", async () => {
+    const seed = leagueSeed(
+      [
+        { id: "psg", name: "PSG" },
+        { id: "bayern", name: "Bayern Munich" },
+      ],
+      [soccerEvent("e1")],
+    );
+    const { store, saved } = fakeStore(seed);
+
+    const upd = await updateCalendar(store, {
+      id: "ucl-2026",
+      events: [soccerEvent("e1")],
+      teams: [
+        { id: "psg", name: "Paris Saint-Germain" }, // renamed
+        // bayern removed
+        { id: "real-madrid", name: "Real Madrid" }, // added
+      ],
+    });
+
+    expect(upd.teams_diff).toBeDefined();
+    expect(upd.teams_diff?.added).toEqual([
+      { id: "real-madrid", name: "Real Madrid" },
+    ]);
+    expect(upd.teams_diff?.removed).toEqual([
+      { id: "bayern", name: "Bayern Munich" },
+    ]);
+    expect(upd.teams_diff?.renamed).toEqual([
+      { id: "psg", before: "PSG", after: "Paris Saint-Germain" },
+    ]);
+    expect(upd.is_noop).toBe(false); // teams changed → not no-op
+    expect(saved).toHaveLength(0); // still review-then-commit
+  });
+
+  it("commits teams[] alongside events on apply", async () => {
+    const seed = leagueSeed(
+      [{ id: "psg", name: "PSG" }],
+      [soccerEvent("e1", { title: "Old Title" })],
+    );
+    const { store, saved } = fakeStore(seed);
+
+    const upd = await updateCalendar(store, {
+      id: "ucl-2026",
+      events: [soccerEvent("e1", { title: "New Title" })],
+      teams: [
+        { id: "psg", name: "PSG" },
+        { id: "bayern", name: "Bayern Munich" },
+      ],
+    });
+    await applyCalendarUpdate(store, { token: upd.token });
+
+    expect(saved).toHaveLength(1);
+    const committed = saved[0]?.calendar as Record<string, unknown>;
+    expect(committed["teams"]).toEqual([
+      { id: "psg", name: "PSG" },
+      { id: "bayern", name: "Bayern Munich" },
+    ]);
+  });
+
+  it("is_noop=true when only events match and teams unchanged", async () => {
+    const seed = leagueSeed(
+      [{ id: "psg", name: "PSG" }],
+      [soccerEvent("e1")],
+    );
+    const { store } = fakeStore(seed);
+
+    const upd = await updateCalendar(store, {
+      id: "ucl-2026",
+      events: [soccerEvent("e1")],
+      teams: [{ id: "psg", name: "PSG" }],
+    });
+    expect(upd.is_noop).toBe(true);
+    expect(upd.teams_diff?.added).toEqual([]);
+    expect(upd.teams_diff?.removed).toEqual([]);
+    expect(upd.teams_diff?.renamed).toEqual([]);
+  });
+
+  it("teams_diff omitted when teams[] not provided in input", async () => {
+    const seed = leagueSeed([], [soccerEvent("e1")]);
+    const { store } = fakeStore(seed);
+
+    const upd = await updateCalendar(store, {
+      id: "ucl-2026",
+      events: [soccerEvent("e1")],
+    });
+    expect(upd.teams_diff).toBeUndefined();
+  });
+
+  it("rejects invalid team id format", async () => {
+    const seed = leagueSeed([], [soccerEvent("e1")]);
+    const { store } = fakeStore(seed);
+
+    await expect(
+      updateCalendar(store, {
+        id: "ucl-2026",
+        events: [soccerEvent("e1")],
+        teams: [{ id: "BadID", name: "Bad" }],
+      }),
+    ).rejects.toThrow(/teams\[0\]\.id must match/);
   });
 });

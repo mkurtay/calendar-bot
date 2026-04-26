@@ -4,17 +4,30 @@
 // here plus the per-category model module.
 
 import type { ValidationResult } from "./types.js";
-import { validateSoccerEvent } from "./soccer/validators.js";
+import {
+  validateSoccerCalendar,
+  validateSoccerEvent,
+} from "./soccer/validators.js";
 import { validateF1Event } from "./formula1/validators.js";
 
 export type Category = "soccer" | "formula1";
 
 export interface CategoryModel {
+  // Validates a single event in isolation (no calendar context).
   validate: (event: unknown) => ValidationResult;
+  // Optional: validates a full calendar including cross-rules that
+  // require calendar-level context (e.g. type→stage compatibility,
+  // foreign-key references). When defined, callers should prefer
+  // this over per-event validate() — it already runs validate()
+  // internally for each event plus the cross-rules.
+  validateCalendar?: (calendar: unknown) => ValidationResult;
 }
 
 const REGISTRY: Record<Category, CategoryModel> = {
-  soccer: { validate: validateSoccerEvent },
+  soccer: {
+    validate: validateSoccerEvent,
+    validateCalendar: validateSoccerCalendar,
+  },
   formula1: { validate: validateF1Event },
 };
 
