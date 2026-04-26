@@ -18,12 +18,12 @@
 - Local variable rename `server` → `mcp` for clarity
 
 **Acceptance:**
-- [ ] `pnpm typecheck` passes with zero errors and zero deprecation warnings on `Server`
-- [ ] `pnpm build` produces `dist/src/server.js` cleanly
-- [ ] Manual `initialize` test against `dist/src/server.js` returns the expected JSON-RPC response
-- [ ] Restart Claude Desktop; `list_calendars` works as before
+- [x] `pnpm typecheck` passes with zero errors and zero deprecation warnings on `Server`
+- [x] `pnpm build` produces `dist/src/server.js` cleanly
+- [x] Manual `initialize` test against `dist/src/server.js` returns the expected JSON-RPC response
+- [ ] Restart Claude Desktop; `list_calendars` works as before *(user-side; not yet verified by them)*
 
-**Commit:** `Migrate to McpServer (deprecation cleanup, Path A)`
+**Commit:** `Migrate to McpServer (deprecation cleanup, Path A)` — landed as part of `393d15c` (initial commit)
 
 ---
 
@@ -36,10 +36,10 @@
 - Add `__tests__/config.test.ts` covering missing-token rejection.
 
 **Acceptance:**
-- [ ] `pnpm test config` passes
-- [ ] `server.ts` no longer reads `process.env` directly
+- [x] `pnpm test config` passes (4/4)
+- [x] `server.ts` no longer reads `process.env` directly
 
-**Commit:** `Extract env config into src/config.ts with tests`
+**Commit:** `Extract env config into src/config.ts with tests` — landed as `a006fce` (Jest setup) + `cd9fc09` (config extraction)
 
 ---
 
@@ -58,9 +58,9 @@
 - `models/registry.ts` — `category → { validate, slugify, defaults }` lookup.
 
 **Acceptance:**
-- [ ] `pnpm test models` passes
-- [ ] Stage normalization handles `LAST_16`, `Round of 16`, `R16` → all map to `R16`
-- [ ] Leg derivation correctly assigns 1/2 across same-pair UCL ties
+- [x] `pnpm test models` passes (50/50 across 4 suites)
+- [x] Stage normalization handles `LAST_16`, `Round of 16`, `R16` → all map to `R16`
+- [x] Leg derivation correctly assigns 1/2 across same-pair UCL ties
 
 **Commit:** `Add per-category models with stage normalization and leg derivation`
 
