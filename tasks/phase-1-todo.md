@@ -173,8 +173,9 @@
 - kurtays-calendar README: explain that `data/*.json` is now the source of truth for *both* events *and* index card metadata; mention the new auto-render step.
 
 **Acceptance:**
-- [ ] Both READMEs accurately describe the post-Phase-1 system
-- [ ] No stale references to direct `add_event` instructions
+- [x] calendar-bot README accurately describes the post-Phase-1 system
+- [x] No stale references to direct `add_event` instructions in calendar-bot README
+- [ ] kurtays-calendar README *(handled in user's parallel session in that repo)*
 
 **Commit (each repo):** `Document Phase 1 tool surface and index auto-render`
 
