@@ -71,4 +71,21 @@ export class CalendarStore {
     const content = JSON.stringify(calendar, null, 2) + "\n";
     return this.gh.putFile({ path, content, sha, message });
   }
+
+  // Creates a new calendar at data/<id>.json. Rejects if a calendar
+  // with that id already exists (the underlying GitHub API surfaces
+  // a 422; createFile rethrows as a clear error message).
+  async create(
+    calendar: Calendar,
+    message: string,
+  ): Promise<{ sha: string; commitUrl: string; path: string }> {
+    const path = `data/${calendar.id}.json`;
+    const content = JSON.stringify(calendar, null, 2) + "\n";
+    const { sha, commitUrl } = await this.gh.createFile({
+      path,
+      content,
+      message,
+    });
+    return { sha, commitUrl, path };
+  }
 }

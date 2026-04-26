@@ -12,9 +12,15 @@ import {
 import { GitHub } from "./github.js";
 import { CalendarStore } from "./calendar-store.js";
 import * as tools from "./tools.js";
+import {
+  CREATE_CALENDAR_TOOL,
+  createCalendar,
+  type CreateCalendarParams,
+} from "./tools/create-calendar.js";
 import { ConfigError, loadConfig } from "./config.js";
 
 const TOOL_DEFINITIONS = [
+  CREATE_CALENDAR_TOOL,
   {
     name: "list_calendars",
     description:
@@ -193,6 +199,8 @@ async function dispatch(
   store: CalendarStore,
 ): Promise<unknown> {
   switch (name) {
+    case "create_calendar":
+      return createCalendar(store, args as unknown as CreateCalendarParams);
     case "list_calendars":
       return tools.listCalendars(store);
     case "list_events":

@@ -70,4 +70,40 @@ export class GitHub {
     }
     return { sha: newSha, commitUrl };
   }
+
+  // Creates a new file at `path`. Throws a clear error if the file
+  // already exists (GitHub returns 422 when sha is omitted on a path
+  // that already has content).
+  async createFile(args: {
+    path: string;
+    content: string;
+    message: string;
+  }): Promise<{ sha: string; commitUrl: string }> {
+    try {
+      const res = await this.octokit.repos.createOrUpdateFileContents({
+        owner: this.config.owner,
+        repo: this.config.repo,
+        branch: this.config.branch,
+        path: args.path,
+        message: args.message,
+        content: Buffer.from(args.content, "utf8").toString("base64"),
+      });
+      const newSha = res.data.content?.sha;
+      const commitUrl = res.data.commit?.html_url ?? "";
+      if (!newSha) {
+        throw new Error("GitHub createFile returned no SHA");
+      }
+      return { sha: newSha, commitUrl };
+    } catch (err) {
+      if (
+        err &&
+        typeof err === "object" &&
+        "status" in err &&
+        (err as { status: number }).status === 422
+      ) {
+        throw new Error(`File already exists at ${args.path}`);
+      }
+      throw err;
+    }
+  }
 }

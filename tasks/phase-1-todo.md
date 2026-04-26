@@ -101,9 +101,9 @@
 - Tests with passthrough `manual.ts` provider.
 
 **Acceptance:**
-- [ ] `pnpm test create-calendar` passes
-- [ ] Tool refuses to create if `id` already exists in repo
-- [ ] Manual smoke test: ask Claude Desktop to create a tiny new test calendar, verify commit at `mkurtay/kurtays-calendar`
+- [x] `pnpm test create-calendar` passes (12/12)
+- [x] Tool refuses to create if `id` already exists in repo (via 422 from GitHub, unit-tested with mocked store)
+- [ ] Manual smoke test: ask Claude Desktop to create a tiny new test calendar, verify commit at `mkurtay/kurtays-calendar` *(user-side; pending after Claude Desktop restart)*
 
 **Commit:** `Add create_calendar tool with category validation`
 
