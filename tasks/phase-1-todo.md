@@ -80,9 +80,9 @@
 - Tests cover all three Q2 sub-rules plus token expiry.
 
 **Acceptance:**
-- [ ] `pnpm test diff` passes
-- [ ] Merge policy preserves a manually-set `result` when source returns a different one
-- [ ] `local_only: true` events neither updated nor removed by diff
+- [x] `pnpm test diff` passes (33 tests across compute/policy/tokens)
+- [x] Merge policy preserves a manually-set `result` when source returns a different one
+- [x] `local_only: true` events neither updated nor removed by diff
 
 **Commit:** `Add diff engine with merge policy and review-token storage`
 
