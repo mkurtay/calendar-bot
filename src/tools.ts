@@ -3,6 +3,29 @@ import type {
   CalendarStore,
   CalendarEvent,
 } from "./calendar-store.js";
+import { getCategoryModel, isKnownCategory } from "./models/registry.js";
+
+// Validates a single event against the calendar's category model.
+// Used by the granular CRUD tools (add_event/update_event/set_result)
+// to reject malformed input before it reaches GitHub commits — the
+// equivalent of what create_calendar and update_calendar already do
+// at the calendar level.
+//
+// Per-event validation only: cross-rules that need calendar context
+// (type→stage compatibility, team-id refs, matchday-required-for-
+// cup_groups) are still only enforced through update_calendar's
+// validateSoccerCalendar path. Granular tools are advanced/fallback;
+// the high-level tools own the full cross-rule guarantee.
+function validateOrThrow(category: string, event: CalendarEvent): void {
+  if (!isKnownCategory(category)) return;
+  const model = getCategoryModel(category);
+  const result = model.validate(event);
+  if (!result.ok) {
+    throw new Error(
+      `Invalid event for category "${category}":\n${result.errors.join("\n")}`,
+    );
+  }
+}
 
 export interface ListEventsParams {
   calendar_id: string;
@@ -76,6 +99,7 @@ export async function addEvent(store: CalendarStore, p: AddEventParams) {
     ...(p.description_lines && { description_lines: p.description_lines }),
     ...(p.typed_block ?? {}),
   };
+  validateOrThrow(calendar.category, event);
   calendar.events.push(event);
   const { sha: newSha, commitUrl } = await store.saveCalendar(
     calendar,
@@ -96,6 +120,7 @@ export async function updateEvent(
   }
   const before = calendar.events[idx]!;
   const after: CalendarEvent = { ...before, ...p.patch };
+  validateOrThrow(calendar.category, after);
   calendar.events[idx] = after;
   const { sha: newSha, commitUrl } = await store.saveCalendar(
     calendar,
@@ -135,6 +160,7 @@ export async function setResult(store: CalendarStore, p: SetResultParams) {
     result: p.result,
     ...(p.mark_completed !== false ? { status: "completed" as const } : {}),
   };
+  validateOrThrow(calendar.category, after);
   calendar.events[idx] = after;
   const { sha: newSha, commitUrl } = await store.saveCalendar(
     calendar,
