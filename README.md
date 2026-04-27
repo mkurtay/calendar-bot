@@ -6,7 +6,7 @@ MCP server that mutates the [`mkurtay/kurtays-calendar`](https://github.com/mkur
 - **Phase 2** — Auto-fetching from external sources (football-data.org for soccer, jolpica-f1 for F1)
 - **Phase 3+** — HTTP transport (Claude.ai web, Telegram bot via AWS Lambda), standings/charts in renderer
 
-See [`tasks/phase-1-architecture.md`](tasks/phase-1-architecture.md) for the current architecture and design decisions, and [`tasks/phase-1-todo.md`](tasks/phase-1-todo.md) for the per-step execution plan.
+See [`tasks/phase-1-architecture.md`](tasks/phase-1-architecture.md) for the design decisions behind the current shape, and [`tasks/phase-2-architecture.md`](tasks/phase-2-architecture.md) for the next-phase plans.
 
 ## How it works
 

@@ -1,7 +1,7 @@
 # Phase 1 Architecture — Smart Calendar MCP
 
-> Captured 2026-04-26. Locks the design decisions and file layout that
-> [phase-1-todo.md](./phase-1-todo.md) executes against.
+> Captured 2026-04-26. Locks the design decisions and file layout
+> for Phase 1 (shipped — see git history for execution).
 
 ---
 
@@ -236,4 +236,3 @@ To keep the surface area finite, these are explicitly deferred:
       page shows "next up" + "live now" badge correctly when relevant
       events exist.
 - [ ] Both repo READMEs updated to reflect the new tool surface.
-- [ ] [phase-1-todo.md](./phase-1-todo.md) all items checked.

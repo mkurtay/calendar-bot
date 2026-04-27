@@ -34,9 +34,9 @@ The MCP server is **transport-agnostic** at the core (`tools.ts` knows nothing a
 - **The schema is owned by the kurtays-calendar repo**, not this one. This repo trusts what Claude generates against the tool descriptions. If the JSON gets corrupted, the calendar repo's CI fails (renderer crashes) and prevents a bad deploy — `verify` job runs before `deploy` in `kurtays-calendar/.github/workflows/deploy.yml`.
 - **Date format is ISO-8601 UTC ending in 'Z'.** The calendar renderers reject anything else.
 
-## Phased rollout (see tasks/todo.md)
+## Phased rollout
 
-- **Phase 1** — stdio MCP for Claude Desktop. Local only. ← *current*
+- **Phase 1** — stdio MCP for Claude Desktop. Local only. ← _current_
 - **Phase 2** — HTTP transport, Lambda deploy via Terraform in `~/workspace/tinbee/infra-aws/terraform/agents/calendar-bot/`.
 - **Phase 3** — Telegram bot Lambda that calls Claude API with this MCP server attached.
 
