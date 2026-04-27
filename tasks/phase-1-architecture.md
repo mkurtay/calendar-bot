@@ -116,16 +116,17 @@ src/
 
 ### kurtays-calendar (sibling repo)
 
+> **As implemented:** `render-index.mjs` logic landed inside `scripts/render-html.mjs` rather than as a separate script — the per-calendar page renderer and the index-card renderer share enough utilities (escapeHtml, status-aware classification, marker replacement) that consolidation was simpler. The marker pair is `<!-- BEGIN GENERATED:index-cards -->` (plus a separate `:footer` pair). deploy.yml runs `render-html.mjs` and `render-ics.mjs`; no separate index step.
+
 ```
 data/*.json                    # source-of-truth calendars; gains `presentation` block + `local_only` field
-index.html                     # add markers <!-- BEGIN GENERATED:calendars --> / <!-- END -->
+index.html                     # markers: <!-- BEGIN GENERATED:index-cards --> + <!-- BEGIN GENERATED:footer -->
 *.html                         # existing per-calendar pages, unchanged structure
 *.ics                          # existing, regenerated in CI
 scripts/
-├── render-html.mjs            # existing — extended in Phase 4 with standings + charts
-├── render-ics.mjs             # existing
-└── render-index.mjs           # NEW — generates index cards from data/*.json
-.github/workflows/deploy.yml   # add `node scripts/render-index.mjs` step
+├── render-html.mjs            # per-page content AND index-card auto-rendering; Phase 4 adds standings + charts
+└── render-ics.mjs             # existing
+.github/workflows/deploy.yml   # render-html.mjs + render-ics.mjs steps
 ```
 
 ---
@@ -179,7 +180,7 @@ scripts/
 
 ## Index page rendering
 
-Build-time (`render-index.mjs`):
+Build-time (inside `render-html.mjs`):
 - Reads `data/*.json`, sorted deterministically (by `id` ascending so animation order is stable).
 - Computes per-card:
   - `presentation.subtitle` / `badge_label` / `accent_color` / `icon` (from JSON)

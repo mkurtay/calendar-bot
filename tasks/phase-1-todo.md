@@ -143,7 +143,11 @@
 
 ---
 
-## Step 8 — `render-index.mjs` in kurtays-calendar
+## Step 8 — Index card auto-rendering in kurtays-calendar
+
+> **Status: ✅ shipped via the parallel session.** Implementation diverged from the original plan: the index-card logic landed inside `scripts/render-html.mjs` (consolidated with the per-page renderer) rather than as a separate `render-index.mjs` script. Marker pair: `<!-- BEGIN GENERATED:index-cards -->`, plus a separate `:footer` pair. deploy.yml uses `render-html.mjs` + `render-ics.mjs`; no separate index step. See kurtays-calendar commit `7d59a04` ("Generate footer + index cards from JSON via marker pairs").
+
+**Original plan (preserved for reference):**
 
 **Repo:** `kurtays-calendar`. **Files touched:** `scripts/render-index.mjs` (new), `index.html` (add markers), `.github/workflows/deploy.yml` (add render step), `data/*.json` (add `presentation` blocks).
 
