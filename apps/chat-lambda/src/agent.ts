@@ -82,6 +82,9 @@ interface RunAgentArgs {
   confirmations: PendingConfirmations;
   ghToken: string;
   anthropicApiKey: string;
+  /** Optional — if provided, forwarded to the MCP subprocess so the
+   *  football-data fetch_* tools can call football-data.org. */
+  footballDataToken?: string | undefined;
 }
 
 export async function runAgent({
@@ -91,6 +94,7 @@ export async function runAgent({
   confirmations,
   ghToken,
   anthropicApiKey,
+  footballDataToken,
 }: RunAgentArgs): Promise<void> {
   const taskRoot = process.env.LAMBDA_TASK_ROOT || resolve(import.meta.dirname || ".", "..");
   const serverEntry = resolve(taskRoot, "server", "server.js");
@@ -102,6 +106,7 @@ export async function runAgent({
     env: {
       ...(process.env as Record<string, string>),
       GH_TOKEN: ghToken,
+      ...(footballDataToken ? { FOOTBALL_DATA_TOKEN: footballDataToken } : {}),
     },
   });
   const mcp = new Client({ name: "cal-chat-lambda", version: "0.1.0" });

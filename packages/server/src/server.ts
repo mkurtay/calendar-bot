@@ -27,6 +27,20 @@ import {
   applyCalendarUpdate,
   type ApplyCalendarUpdateParams,
 } from "./tools/apply-calendar-update.js";
+import {
+  FETCH_COMPETITION_MATCHES_TOOL,
+  fetchCompetitionMatches,
+  type FetchCompetitionMatchesParams,
+  FETCH_COMPETITION_STANDINGS_TOOL,
+  fetchCompetitionStandings,
+  type FetchCompetitionStandingsParams,
+  FETCH_TEAM_FIXTURES_TOOL,
+  fetchTeamFixtures,
+  type FetchTeamFixturesParams,
+  FETCH_COMPETITION_SCORERS_TOOL,
+  fetchCompetitionScorers,
+  type FetchCompetitionScorersParams,
+} from "./tools/football-data.js";
 import { ConfigError, loadConfig } from "./config.js";
 
 const TOOL_DEFINITIONS = [
@@ -175,6 +189,10 @@ const TOOL_DEFINITIONS = [
       additionalProperties: false,
     },
   },
+  FETCH_COMPETITION_MATCHES_TOOL,
+  FETCH_COMPETITION_STANDINGS_TOOL,
+  FETCH_TEAM_FIXTURES_TOOL,
+  FETCH_COMPETITION_SCORERS_TOOL,
 ];
 
 function createServer(store: CalendarStore): McpServer {
@@ -233,6 +251,18 @@ async function dispatch(
       return tools.removeEvent(store, args as unknown as tools.RemoveEventParams);
     case "set_result":
       return tools.setResult(store, args as unknown as tools.SetResultParams);
+    case "fetch_competition_matches":
+      return fetchCompetitionMatches(args as unknown as FetchCompetitionMatchesParams);
+    case "fetch_competition_standings":
+      return fetchCompetitionStandings(
+        args as unknown as FetchCompetitionStandingsParams,
+      );
+    case "fetch_team_fixtures":
+      return fetchTeamFixtures(args as unknown as FetchTeamFixturesParams);
+    case "fetch_competition_scorers":
+      return fetchCompetitionScorers(
+        args as unknown as FetchCompetitionScorersParams,
+      );
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
