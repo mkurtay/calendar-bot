@@ -24,14 +24,14 @@ export const processEnvSource: ConfigSource = {
 };
 
 export function loadConfig(source: ConfigSource = processEnvSource): Config {
-  const token = source.get("GITHUB_TOKEN");
+  const token = source.get("GH_TOKEN");
   if (!token) {
-    throw new ConfigError("GITHUB_TOKEN env var required. See .env.example for details.");
+    throw new ConfigError("GH_TOKEN env var required. See .env.example for details.");
   }
   return {
     github: {
       owner: source.get("GITHUB_OWNER") ?? "mkurtay",
-      repo: source.get("GITHUB_REPO") ?? "kurtays-calendar",
+      repo: source.get("GITHUB_REPO") ?? "cal",
       branch: source.get("GITHUB_BRANCH") ?? "main",
       token,
     },
