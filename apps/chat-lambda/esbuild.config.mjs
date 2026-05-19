@@ -16,13 +16,27 @@ import { dirname, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = resolve(here, "dist");
-const serverDist = resolve(here, "..", "..", "packages", "server", "dist");
+const serverSrc = resolve(here, "..", "..", "packages", "server", "src", "server.ts");
+
+const esmBanner = [
+  "import { createRequire as _csr } from 'module';",
+  "import { fileURLToPath as _ftp } from 'url';",
+  "import { dirname as _dn } from 'path';",
+  "const require = _csr(import.meta.url);",
+  "const __filename = _ftp(import.meta.url);",
+  "const __dirname = _dn(__filename);",
+].join("");
 
 // Clean dist
 if (existsSync(dist)) await rm(dist, { recursive: true });
 await mkdir(dist, { recursive: true });
 
-// Bundle the Lambda handler
+// Bundle the Lambda handler.
+// CJS deps that survive the bundle (inside @modelcontextprotocol/sdk's
+// transitive chain) emit `require()` calls. esbuild's default ESM output
+// rewrites those to `__require` which throws "Dynamic require of <x>
+// is not supported" at runtime. The banner polyfills `require`,
+// `__filename`, and `__dirname` for the bundled CJS code.
 await build({
   entryPoints: [resolve(here, "src", "handler.ts")],
   outfile: resolve(here, "dist", "index.mjs"),
@@ -32,41 +46,29 @@ await build({
   bundle: true,
   minify: true,
   sourcemap: "external",
-  // The MCP server is spawned as a subprocess, so we ship its compiled
-  // output alongside index.mjs and reference it via $LAMBDA_TASK_ROOT.
-  // Keep these unbundled.
+  // The MCP server is spawned as a subprocess from a separate bundled
+  // file; it's not imported by the handler, so keep it external.
   external: ["@calendar-bot/server"],
-  // CJS deps that survive the bundle (e.g. inside @modelcontextprotocol/sdk
-  // transitive chain) emit `require()` calls. esbuild's default ESM output
-  // rewrites those to `__require` which throws "Dynamic require of <x>
-  // is not supported" at runtime. The banner polyfills `require`,
-  // `__filename`, and `__dirname` for the bundled CJS code.
-  banner: {
-    js: [
-      "import { createRequire as _csr } from 'module';",
-      "import { fileURLToPath as _ftp } from 'url';",
-      "import { dirname as _dn } from 'path';",
-      "const require = _csr(import.meta.url);",
-      "const __filename = _ftp(import.meta.url);",
-      "const __dirname = _dn(__filename);",
-    ].join(""),
-  },
+  banner: { js: esmBanner },
   logLevel: "info",
 });
 
-// Stage the compiled MCP server next to index.mjs
-if (!existsSync(serverDist)) {
-  throw new Error(
-    `Server build not found at ${serverDist}. Run \`pnpm --filter @calendar-bot/server build\` first.`,
-  );
-}
-await mkdir(resolve(dist, "server"), { recursive: true });
-await cp(serverDist, resolve(dist, "server"), { recursive: true });
-
-// Also copy the server's package.json (subprocess needs the bin entry)
-await cp(
-  resolve(here, "..", "..", "packages", "server", "package.json"),
-  resolve(dist, "server", "package.json"),
-);
+// Bundle the MCP server too. It runs as its own Node subprocess, so it
+// needs its own self-contained file — staging compiled tsc output would
+// leave its imports (e.g. @modelcontextprotocol/sdk) unresolved at
+// runtime because the Lambda zip has no node_modules. Same banner as
+// the handler so any CJS deps in the server's chain work too.
+await build({
+  entryPoints: [serverSrc],
+  outfile: resolve(here, "dist", "server", "server.js"),
+  platform: "node",
+  target: "node22",
+  format: "esm",
+  bundle: true,
+  minify: true,
+  sourcemap: "external",
+  banner: { js: esmBanner },
+  logLevel: "info",
+});
 
 console.log("✓ chat-lambda built →", dist);
