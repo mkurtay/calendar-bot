@@ -81,7 +81,7 @@ export async function runAgent({
   anthropicApiKey,
 }: RunAgentArgs): Promise<void> {
   const taskRoot = process.env.LAMBDA_TASK_ROOT || resolve(import.meta.dirname || ".", "..");
-  const serverEntry = resolve(taskRoot, "server", "src", "server.js");
+  const serverEntry = resolve(taskRoot, "server", "server.js");
 
   // Spawn the MCP server as a stdio subprocess.
   const transport = new StdioClientTransport({
