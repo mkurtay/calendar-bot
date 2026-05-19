@@ -5,20 +5,20 @@ function source(env: Record<string, string | undefined>): ConfigSource {
 }
 
 describe("loadConfig", () => {
-  it("rejects when GITHUB_TOKEN is missing", () => {
+  it("rejects when GH_TOKEN is missing", () => {
     expect(() => loadConfig(source({}))).toThrow(ConfigError);
-    expect(() => loadConfig(source({}))).toThrow(/GITHUB_TOKEN/);
+    expect(() => loadConfig(source({}))).toThrow(/GH_TOKEN/);
   });
 
-  it("rejects when GITHUB_TOKEN is empty string", () => {
-    expect(() => loadConfig(source({ GITHUB_TOKEN: "" }))).toThrow(ConfigError);
+  it("rejects when GH_TOKEN is empty string", () => {
+    expect(() => loadConfig(source({ GH_TOKEN: "" }))).toThrow(ConfigError);
   });
 
-  it("returns defaults when only GITHUB_TOKEN is set", () => {
-    const config = loadConfig(source({ GITHUB_TOKEN: "ghp_test" }));
+  it("returns defaults when only GH_TOKEN is set", () => {
+    const config = loadConfig(source({ GH_TOKEN: "ghp_test" }));
     expect(config.github).toEqual({
       owner: "mkurtay",
-      repo: "kurtays-calendar",
+      repo: "cal",
       branch: "main",
       token: "ghp_test",
     });
@@ -27,7 +27,7 @@ describe("loadConfig", () => {
   it("overrides each default from env", () => {
     const config = loadConfig(
       source({
-        GITHUB_TOKEN: "ghp_test",
+        GH_TOKEN: "ghp_test",
         GITHUB_OWNER: "another-user",
         GITHUB_REPO: "another-repo",
         GITHUB_BRANCH: "develop",
