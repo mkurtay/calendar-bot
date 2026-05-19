@@ -107,6 +107,11 @@ export const handler = awslambda.streamifyResponse(
           sse.close();
           return;
         }
+        // football-data is optional — the four fetch_* tools throw a
+        // clear "FOOTBALL_DATA_TOKEN not set" error if called without
+        // it, which the agent will surface as a tool-result. So we
+        // don't block startup on its absence.
+        const footballDataToken = process.env.FOOTBALL_DATA_TOKEN;
         await runAgent({
           userId: verified.userId,
           userMessage,
@@ -114,6 +119,7 @@ export const handler = awslambda.streamifyResponse(
           confirmations,
           ghToken,
           anthropicApiKey,
+          footballDataToken,
         });
         sse.close();
         return;
