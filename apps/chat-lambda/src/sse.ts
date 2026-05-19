@@ -11,7 +11,17 @@
  *   - `confirm` — tool requires user confirmation (canUseTool gate)
  *   - `error`  — non-fatal stream error
  *   - `done`   — stream is closing normally
+ *
+ * Keep-alives:
+ *   Browsers (notably Safari) abort SSE streams that go idle for too
+ *   long after headers arrive. Same for CloudFront's origin-read
+ *   timeout. We write a `:` comment frame every KEEPALIVE_INTERVAL_MS
+ *   to keep the wire warm during agent "thinking" gaps (Anthropic
+ *   stream init, MCP tool calls, etc.). Per the SSE spec, lines
+ *   starting with `:` are comments and clients drop them silently.
  */
+
+const KEEPALIVE_INTERVAL_MS = 10_000;
 
 export type SseEvent =
   | { type: "delta"; text: string }
@@ -27,9 +37,25 @@ export interface SseWriter {
 
 export function makeSseWriter(stream: NodeJS.WritableStream): SseWriter {
   let closed = false;
+  // Send an initial comment immediately so the client sees bytes
+  // before any real event is emitted — defeats some browsers' "first
+  // byte" idle timer that fires before headers are even parsed.
+  try {
+    stream.write(": stream-open\n\n");
+  } catch {
+    /* stream gone already */
+  }
+
+  const keepalive = setInterval(() => {
+    if (closed) return;
+    try {
+      stream.write(": keep-alive\n\n");
+    } catch {
+      /* stream gone — close() will clean up the interval */
+    }
+  }, KEEPALIVE_INTERVAL_MS);
 
   function frame(event: SseEvent): string {
-    // SSE: "event: <type>\ndata: <json>\n\n"
     return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
   }
 
@@ -41,6 +67,7 @@ export function makeSseWriter(stream: NodeJS.WritableStream): SseWriter {
     close(): void {
       if (closed) return;
       closed = true;
+      clearInterval(keepalive);
       try {
         stream.write(frame({ type: "done" }));
         stream.end();
