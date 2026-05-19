@@ -36,8 +36,21 @@ await build({
   // output alongside index.mjs and reference it via $LAMBDA_TASK_ROOT.
   // Keep these unbundled.
   external: ["@calendar-bot/server"],
-  // ESM needs an explicit banner for `import.meta.url` to work after
-  // bundling, but esbuild's ESM output handles this natively for node22.
+  // CJS deps that survive the bundle (e.g. inside @modelcontextprotocol/sdk
+  // transitive chain) emit `require()` calls. esbuild's default ESM output
+  // rewrites those to `__require` which throws "Dynamic require of <x>
+  // is not supported" at runtime. The banner polyfills `require`,
+  // `__filename`, and `__dirname` for the bundled CJS code.
+  banner: {
+    js: [
+      "import { createRequire as _csr } from 'module';",
+      "import { fileURLToPath as _ftp } from 'url';",
+      "import { dirname as _dn } from 'path';",
+      "const require = _csr(import.meta.url);",
+      "const __filename = _ftp(import.meta.url);",
+      "const __dirname = _dn(__filename);",
+    ].join(""),
+  },
   logLevel: "info",
 });
 
