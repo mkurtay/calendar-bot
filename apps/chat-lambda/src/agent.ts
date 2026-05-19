@@ -29,6 +29,16 @@ const CONFIRMATION_TTL_MS = 5 * 60 * 1000;
 const MAX_TURNS = 20;
 const MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS = 4096;
+// Roll the per-user conversation history at this many messages. ~15
+// user turns assuming each turn writes one user + one assistant
+// message (plus any tool_result/tool_use pairs Claude appends). Keeps
+// the context window from filling up across a long session.
+const HISTORY_LIMIT = 30;
+
+// Per-warm-container conversation history, keyed by Clerk user id.
+// Cold starts lose this — acceptable for a small allowlist where the
+// warm container stays alive for the typical interactive session.
+const chatHistory = new Map<string, Anthropic.Messages.MessageParam[]>();
 
 export interface PendingConfirmations {
   resolve(id: string, approved: boolean): void;
@@ -66,6 +76,7 @@ export function makePendingConfirmations(): PendingConfirmations {
 }
 
 interface RunAgentArgs {
+  userId: string;
   userMessage: string;
   sse: SseWriter;
   confirmations: PendingConfirmations;
@@ -74,6 +85,7 @@ interface RunAgentArgs {
 }
 
 export async function runAgent({
+  userId,
   userMessage,
   sse,
   confirmations,
@@ -94,6 +106,14 @@ export async function runAgent({
   });
   const mcp = new Client({ name: "cal-chat-lambda", version: "0.1.0" });
 
+  // Hoisted so the `finally` block can persist whatever this turn
+  // accumulated (and so it's safe to read even if mcp.connect throws
+  // before the messages literal below would have run).
+  const messages: Anthropic.Messages.MessageParam[] = [
+    ...(chatHistory.get(userId) ?? []),
+    { role: "user", content: userMessage },
+  ];
+
   try {
     await mcp.connect(transport);
 
@@ -108,9 +128,6 @@ export async function runAgent({
     }));
 
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
-    const messages: Anthropic.Messages.MessageParam[] = [
-      { role: "user", content: userMessage },
-    ];
 
     for (let turn = 0; turn < MAX_TURNS; turn++) {
       const stream = anthropic.messages.stream({
@@ -214,6 +231,17 @@ export async function runAgent({
       message: `Hit max turn budget of ${MAX_TURNS} without a final answer.`,
     });
   } finally {
+    // Persist the conversation. The trailing `messages` array contains
+    // the new user message plus every assistant/tool exchange this
+    // turn produced — exactly the right shape for Claude to pick up
+    // on next request. Cap to avoid unbounded growth across long
+    // sessions; drops the oldest messages but keeps the most recent
+    // context. The cap is on whole MessageParam entries, not tokens,
+    // which is approximate but cheap to compute.
+    const trimmed =
+      messages.length > HISTORY_LIMIT ? messages.slice(-HISTORY_LIMIT) : messages;
+    chatHistory.set(userId, trimmed);
+
     await mcp.close().catch(() => {
       // Subprocess teardown is best-effort. The Lambda container will
       // eventually be recycled anyway.
