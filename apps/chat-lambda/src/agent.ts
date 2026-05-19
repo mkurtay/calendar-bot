@@ -20,6 +20,13 @@ import type { SseWriter } from "./sse.js";
 
 const MUTATION_PREFIXES = ["apply_", "create_", "update_", "delete_"];
 
+// How long a pending tool-confirmation lives before it's auto-declined
+// and evicted from the in-memory Map. Bounds the worst case where a
+// client opens the SSE stream, gets a confirm event, then disconnects
+// without responding — without a TTL the resolver + its Promise stay
+// pinned for the warm container's lifetime.
+const CONFIRMATION_TTL_MS = 5 * 60 * 1000;
+
 export interface PendingConfirmations {
   /** Resolves a pending confirmation by id (called by the handler when
    *  the client POSTs to /api/chat/confirm/:id). */
@@ -29,19 +36,34 @@ export interface PendingConfirmations {
   await(id: string): Promise<boolean>;
 }
 
+interface PendingEntry {
+  resolve: (approved: boolean) => void;
+  timer: NodeJS.Timeout;
+}
+
 export function makePendingConfirmations(): PendingConfirmations {
-  const pending = new Map<string, (approved: boolean) => void>();
+  const pending = new Map<string, PendingEntry>();
+  function evict(id: string): PendingEntry | undefined {
+    const entry = pending.get(id);
+    if (!entry) return undefined;
+    clearTimeout(entry.timer);
+    pending.delete(id);
+    return entry;
+  }
   return {
     resolve(id, approved) {
-      const fn = pending.get(id);
-      if (fn) {
-        fn(approved);
-        pending.delete(id);
-      }
+      const entry = evict(id);
+      entry?.resolve(approved);
     },
     await(id) {
       return new Promise<boolean>((resolveFn) => {
-        pending.set(id, resolveFn);
+        const timer = setTimeout(() => {
+          // TTL fired before the client confirmed — auto-decline so
+          // the Agent SDK gets a definitive answer and the Map stays
+          // bounded on long-lived warm containers.
+          if (pending.delete(id)) resolveFn(false);
+        }, CONFIRMATION_TTL_MS);
+        pending.set(id, { resolve: resolveFn, timer });
       });
     },
   };

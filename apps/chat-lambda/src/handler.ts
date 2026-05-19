@@ -34,6 +34,12 @@ declare const awslambda: {
   streamifyResponse: <T>(
     fn: (event: T, responseStream: NodeJS.WritableStream) => Promise<void>,
   ) => unknown;
+  HttpResponseStream: {
+    from(
+      stream: NodeJS.WritableStream,
+      metadata: { statusCode: number; headers?: Record<string, string> },
+    ): NodeJS.WritableStream;
+  };
 };
 
 // Module-scope shared confirmations — survives across requests on a
@@ -43,7 +49,20 @@ const confirmations = makePendingConfirmations();
 
 export const handler = awslambda.streamifyResponse(
   async (event: APIGatewayProxyEventV2, stream: NodeJS.WritableStream): Promise<void> => {
-    const sse = makeSseWriter(stream);
+    // Wrap the raw response stream so the Lambda runtime prepends
+    // HTTP metadata (status + SSE headers) to the response. Without
+    // this, browsers see the body as application/octet-stream and
+    // the EventSource parser refuses to fire.
+    const responseStream = awslambda.HttpResponseStream.from(stream, {
+      statusCode: 200,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
+    });
+    const sse = makeSseWriter(responseStream);
     try {
       const method = event.requestContext.http.method;
       const path = event.requestContext.http.path;
