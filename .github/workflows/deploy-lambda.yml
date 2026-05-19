@@ -1,0 +1,72 @@
+name: Deploy chat-lambda
+
+# Builds the chat-lambda zip and pushes to AWS Lambda on every commit
+# to main. The Lambda function (and its IAM role for OIDC) are owned by
+# the terraform stack at tinbee/infra-aws//terraform/lambda/calendar-bot-chat.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/chat-lambda/**"
+      - "packages/server/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/deploy-lambda.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-lambda-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build server (TypeScript -> dist/)
+        run: pnpm --filter @calendar-bot/server build
+
+      - name: Build chat-lambda bundle
+        run: pnpm --filter @calendar-bot/chat-lambda build
+
+      - name: Zip Lambda payload
+        working-directory: apps/chat-lambda/dist
+        run: zip -r ../lambda-payload.zip .
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_LAMBDA_DEPLOY_ROLE }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Update Lambda function code
+        env:
+          FUNCTION_NAME: calendar-bot-chat
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://apps/chat-lambda/lambda-payload.zip \
+            --publish
+          aws lambda wait function-updated-v2 \
+            --function-name "$FUNCTION_NAME"
+          echo "Deployed: $FUNCTION_NAME"

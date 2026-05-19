@@ -1,3 +1,11 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+
 allowBuilds:
+  # @clerk/shared runs an instrumented postinstall to set up telemetry.
+  # We're using @clerk/backend in the Lambda; the shared package is a
+  # transitive dep. Postinstall is a no-op for our use case.
+  '@clerk/shared': false
   esbuild: true
   unrs-resolver: true

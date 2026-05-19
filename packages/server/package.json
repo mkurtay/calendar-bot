@@ -1,0 +1,33 @@
+{
+  "name": "@calendar-bot/server",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "MCP server that exposes calendar mutation tools backed by mkurtay/cal. Speaks stdio transport for Claude Desktop and for the chat-lambda app (which spawns this as a subprocess).",
+  "main": "dist/src/server.js",
+  "bin": {
+    "calendar-bot-server": "dist/src/server.js"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@octokit/rest": "^21.0.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.10.0",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
