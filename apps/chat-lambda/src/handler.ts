@@ -68,8 +68,9 @@ export const handler = awslambda.streamifyResponse(
       const path = event.requestContext.http.path;
       const authHeader = event.headers["authorization"] || event.headers["Authorization"];
 
-      // Auth gates both endpoints.
-      await verifyAuth(authHeader);
+      // Auth gates both endpoints. userId is used as a key for the
+      // per-session conversation history in runAgent.
+      const verified = await verifyAuth(authHeader);
 
       // Routing
       const confirmMatch = path.match(/^\/api\/chat\/confirm\/(.+)$/);
@@ -107,6 +108,7 @@ export const handler = awslambda.streamifyResponse(
           return;
         }
         await runAgent({
+          userId: verified.userId,
           userMessage,
           sse,
           confirmations,
