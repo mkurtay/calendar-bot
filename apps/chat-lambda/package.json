@@ -10,9 +10,10 @@
     "dev": "tsx src/local-dev.ts"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.0",
+    "@anthropic-ai/sdk": "^0.39.0",
     "@calendar-bot/server": "workspace:*",
-    "@clerk/backend": "^1.20.0"
+    "@clerk/backend": "^1.20.0",
+    "@modelcontextprotocol/sdk": "^1.0.4"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.140",
