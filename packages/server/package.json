@@ -1,9 +1,13 @@
 {
-  "name": "calendar-bot",
+  "name": "@calendar-bot/server",
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "description": "MCP server that exposes calendar mutation tools backed by mkurtay/kurtays-calendar. Phase 1 ships stdio transport for Claude Desktop; later phases add HTTP transport and a Telegram bot frontend.",
+  "description": "MCP server that exposes calendar mutation tools backed by mkurtay/cal. Speaks stdio transport for Claude Desktop and for the chat-lambda app (which spawns this as a subprocess).",
+  "main": "dist/src/server.js",
+  "bin": {
+    "calendar-bot-server": "dist/src/server.js"
+  },
   "scripts": {
     "start": "tsx src/server.ts",
     "build": "tsc",
