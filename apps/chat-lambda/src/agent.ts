@@ -27,7 +27,11 @@ const CONFIRMATION_TTL_MS = 5 * 60 * 1000;
 // Defensive bound: stops a runaway tool-use loop. A real conversation
 // rarely needs more than 5-10 turns.
 const MAX_TURNS = 20;
-const MODEL = "claude-sonnet-4-5";
+// Haiku 4.5 — 3-5x faster than Sonnet on tool-heavy agent loops, well
+// within capability for fetch-then-propose-update_calendar workflows.
+// Flip back to "claude-sonnet-4-5" if multi-step planning ever feels
+// shallow; Opus 4.7 is also an option if the budget allows.
+const MODEL = "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 4096;
 
 // System prompt establishing the bot's identity and the batching rule.
