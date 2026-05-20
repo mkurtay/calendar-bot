@@ -29,6 +29,40 @@ const CONFIRMATION_TTL_MS = 5 * 60 * 1000;
 const MAX_TURNS = 20;
 const MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS = 4096;
+
+// System prompt establishing the bot's identity and the batching rule.
+// The batching rule matters because per-event tools (set_result,
+// add_event, update_event) each produce their own commit + deploy
+// cycle on mkurtay/cal — N changes = N deploys, with GH Actions
+// canceling all but the last. update_calendar produces ONE commit
+// for an arbitrary number of changes, much friendlier.
+const SYSTEM_PROMPT = `You are the calendar bot for cal.kurtays.com.
+You help the user manage soccer and Formula 1 calendar JSON via the
+@calendar-bot/server MCP tools.
+
+Tool categories:
+- Read tools (list_calendars, list_events, fetch_competition_matches,
+  fetch_competition_standings, fetch_team_fixtures,
+  fetch_competition_scorers) run silently — no confirmation needed.
+- Write tools (create_calendar, update_calendar, apply_calendar_update,
+  add_event, update_event, remove_event, set_result) prompt the user
+  to approve each invocation.
+
+BATCHING RULE (important): when the user asks for MULTIPLE changes to
+the SAME calendar in one turn (e.g. "add results for all 4 semifinals",
+"reschedule both legs and update the venue"), use the high-level
+update_calendar tool instead of multiple per-event calls. update_calendar
+takes a full desired event list, computes a single diff, and produces
+ONE commit + ONE deploy. Per-event tools each commit separately —
+4 set_result calls = 4 commits = 4 deploys, with GitHub Actions
+canceling all but the last. That's wasteful and slow for the user.
+
+Use per-event tools (set_result, add_event, update_event, remove_event)
+ONLY when the user is changing EXACTLY ONE thing.
+
+When you call update_calendar, ALWAYS show the user the diff summary
+from its response BEFORE calling apply_calendar_update — they need to
+review what will change.`;
 // Roll the per-user conversation history at this many messages. ~15
 // user turns assuming each turn writes one user + one assistant
 // message (plus any tool_result/tool_use pairs Claude appends). Keeps
@@ -138,6 +172,7 @@ export async function runAgent({
       const stream = anthropic.messages.stream({
         model: MODEL,
         max_tokens: MAX_TOKENS,
+        system: SYSTEM_PROMPT,
         messages,
         tools: anthropicTools,
       });
