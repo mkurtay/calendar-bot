@@ -22,8 +22,26 @@ import type { SseWriter } from "./sse.js";
  * the same per-warm-container Map used before.
  */
 
-const MUTATION_PREFIXES = ["apply_", "create_", "update_", "delete_"];
-const CONFIRMATION_TTL_MS = 5 * 60 * 1000;
+// Tools that actually MUTATE state (commit to GitHub) — gated on a
+// user-approve prompt via canUseTool. update_calendar deliberately
+// NOT in this set: it's a read-only diff computation that returns a
+// token; the matching commit is apply_calendar_update, which IS gated.
+// Earlier we used a prefix match ("update_*") which incorrectly gated
+// update_calendar too, doubling the approve clicks per workflow.
+const MUTATION_TOOLS = new Set([
+  "create_calendar",
+  "apply_calendar_update",
+  "add_event",
+  "update_event",
+  "remove_event",
+  "set_result",
+]);
+// Shorter than the Lambda's 300s timeout so a dropped/unresponded
+// confirm event lets the agent loop recover with an auto-decline
+// rather than racing Lambda's timeout. 90s is plenty for an
+// attentive user; if a user can't click in 90s they've probably
+// closed the tab.
+const CONFIRMATION_TTL_MS = 90 * 1000;
 // Defensive bound: stops a runaway tool-use loop. A real conversation
 // rarely needs more than 5-10 turns.
 const MAX_TURNS = 20;
@@ -222,7 +240,7 @@ export async function runAgent({
       // Call each tool. Mutations gate on canUseTool semantics.
       const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
       for (const use of toolUses) {
-        const isMutation = MUTATION_PREFIXES.some((p) => use.name.startsWith(p));
+        const isMutation = MUTATION_TOOLS.has(use.name);
         if (isMutation) {
           const confirmId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
           sse.send({ type: "confirm", id: confirmId, toolName: use.name, input: use.input });
