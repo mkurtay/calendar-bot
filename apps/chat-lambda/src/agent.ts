@@ -22,25 +22,9 @@ import type { SseWriter } from "./sse.js";
  * the same per-warm-container Map used before.
  */
 
-// Tools that actually MUTATE state (commit to GitHub) — gated on a
-// user-approve prompt via canUseTool. update_calendar deliberately
-// NOT in this set: it's a read-only diff computation that returns a
-// token; the matching commit is apply_calendar_update, which IS gated.
-// Earlier we used a prefix match ("update_*") which incorrectly gated
-// update_calendar too, doubling the approve clicks per workflow.
-const MUTATION_TOOLS = new Set([
-  "create_calendar",
-  "apply_calendar_update",
-  "add_event",
-  "update_event",
-  "remove_event",
-  "set_result",
-]);
-// Shorter than the Lambda's 300s timeout so a dropped/unresponded
-// confirm event lets the agent loop recover with an auto-decline
-// rather than racing Lambda's timeout. 90s is plenty for an
-// attentive user; if a user can't click in 90s they've probably
-// closed the tab.
+// Confirmation TTL is kept for the unused /api/chat/confirm/<id>
+// endpoint compat. Live mutations now use text-based "reply 'apply'"
+// confirmation in chat instead — see the system prompt.
 const CONFIRMATION_TTL_MS = 90 * 1000;
 // Defensive bound: stops a runaway tool-use loop. A real conversation
 // rarely needs more than 5-10 turns.
@@ -59,42 +43,65 @@ const MAX_TOKENS = 4096;
 // canceling all but the last. update_calendar produces ONE commit
 // for an arbitrary number of changes, much friendlier.
 const SYSTEM_PROMPT = `You are the calendar bot for cal.kurtays.com.
-You help the user manage soccer and Formula 1 calendar JSON via the
-@calendar-bot/server MCP tools.
+You manage soccer and Formula 1 calendar JSON via @calendar-bot/server
+MCP tools.
 
-Tool categories:
-- Read tools (list_calendars, list_events, fetch_competition_matches,
-  fetch_competition_standings, fetch_team_fixtures,
-  fetch_competition_scorers) run silently — no confirmation needed.
-- Write tools (create_calendar, update_calendar, apply_calendar_update,
-  add_event, update_event, remove_event, set_result) prompt the user
-  to approve each invocation.
+# Tools
 
-BATCHING RULE (important): when the user asks for MULTIPLE changes to
-the SAME calendar in one turn (e.g. "add results for all 4 semifinals",
-"reschedule both legs and update the venue"), use the high-level
-update_calendar tool instead of multiple per-event calls. update_calendar
-takes a full desired event list, computes a single diff, and produces
-ONE commit + ONE deploy. Per-event tools each commit separately —
-4 set_result calls = 4 commits = 4 deploys, with GitHub Actions
-canceling all but the last. That's wasteful and slow for the user.
+Read (run silently, no confirmation):
+- list_calendars, list_events
+- fetch_competition_matches, fetch_competition_standings
+- fetch_team_fixtures, fetch_competition_scorers
+- update_calendar (returns a DIFF + token, does NOT commit)
 
-Use per-event tools (set_result, add_event, update_event, remove_event)
-ONLY when the user is changing EXACTLY ONE thing.
+Write (each commits a file to GitHub):
+- create_calendar, apply_calendar_update
+- add_event, update_event, remove_event, set_result
 
-When you call update_calendar, ALWAYS show the user the diff summary
-from its response BEFORE calling apply_calendar_update — they need to
-review what will change.
+# HARD RULES — follow these literally
 
-DEPLOY LAG: after ANY successful write (apply_calendar_update succeeded,
-or a direct set_result/add_event/update_event/remove_event/create_calendar
-returned without error), the change is COMMITTED to GitHub immediately
-but the live page at cal.kurtays.com/<calendar>.html takes about 2
-minutes to reflect it. A GitHub Actions workflow builds the static site
-and pushes to S3+CloudFront. Always remind the user at the end of a
-successful write: something like "Committed — should appear on
-cal.kurtays.com in about 2 minutes." This sets expectations so they
-don't immediately refresh the page and think the change was lost.`;
+1. BATCHING. If the user wants MULTIPLE changes to ONE calendar in one
+   turn (e.g. "add 4 SF results", "fix both legs"), call update_calendar
+   ONCE with the full new event list. NEVER chain multiple set_result /
+   add_event / update_event calls — each is its own commit and N
+   commits = N deploys with GH Actions canceling all but the last.
+   Per-event tools ONLY when the user is changing EXACTLY ONE thing.
+
+2. NARRATE BEFORE WRITE. Before calling ANY write tool, write a plain-
+   English text message that:
+   (a) describes what changes you're about to make (event by event,
+       briefly),
+   (b) ends with this EXACT literal sentence on its own line:
+       Reply 'apply' to commit, or 'cancel' to discard.
+       The frontend looks for this exact phrasing and renders clickable
+       Apply / Cancel buttons. If you change the wording, the buttons
+       won't appear and the user has to type the word manually.
+   STOP and wait for the user's next message. Do NOT call the write
+   tool in the same turn — the user needs a chance to review and say
+   "apply" first.
+
+3. APPLY WHEN INSTRUCTED. When the user replies with "apply", "yes",
+   "go", "do it", "commit", or anything affirmative, call the write
+   tool you previously described. Do NOT re-narrate; just call it.
+   When the user replies "cancel", "no", "stop", "discard", or
+   anything negative, do NOT call the tool. Ask what to do next.
+
+4. update_calendar PATTERN. update_calendar is special: it returns a
+   diff summary + a token. The flow is:
+   - call update_calendar with the desired event list
+   - render the diff summary it returned in plain text
+   - end with "Reply 'apply' to commit, or describe what to change."
+   - on user "apply", call apply_calendar_update with the token
+   This is ALWAYS two turns minimum, never one.
+
+5. POST-COMMIT MESSAGE. After ANY write tool succeeds, your response
+   MUST end with: "Committed — should appear on cal.kurtays.com in
+   about 2 minutes." This is non-negotiable; users have seen "silent
+   success" before and lost trust.
+
+6. ALWAYS RESPOND. Never finish a turn with empty text. If you've
+   called a tool, narrate what you did and what you'll do next. Empty
+   responses break the chat UI.`;
 // Roll the per-user conversation history at this many messages. ~15
 // user turns assuming each turn writes one user + one assistant
 // message (plus any tool_result/tool_use pairs Claude appends). Keeps
@@ -145,7 +152,9 @@ interface RunAgentArgs {
   userId: string;
   userMessage: string;
   sse: SseWriter;
-  confirmations: PendingConfirmations;
+  /** Kept for handler signature compat; unused since the confirm-popup
+   *  flow was removed in favor of text-based confirmation. */
+  confirmations?: PendingConfirmations | undefined;
   ghToken: string;
   anthropicApiKey: string;
   /** Optional — if provided, forwarded to the MCP subprocess so the
@@ -157,7 +166,6 @@ export async function runAgent({
   userId,
   userMessage,
   sse,
-  confirmations,
   ghToken,
   anthropicApiKey,
   footballDataToken,
@@ -237,25 +245,17 @@ export async function runAgent({
         return;
       }
 
-      // Call each tool. Mutations gate on canUseTool semantics.
+      // Call each tool. Previously mutation tools sent a `confirm` SSE
+      // event and awaited an approve POST on /api/chat/confirm/<id>,
+      // but module-scope state on Lambda doesn't survive cross-container
+      // routing: the chat-stream request and the confirm POST can land
+      // on different warm containers, so the resolver Map miss → TTL
+      // timeout → auto-decline. Replaced with text-based confirmation
+      // (bot asks the user in plain chat before calling apply_*).
+      // Confirmations type/Map stays in this file for the unused
+      // /api/chat/confirm/:id endpoint compat.
       const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
       for (const use of toolUses) {
-        const isMutation = MUTATION_TOOLS.has(use.name);
-        if (isMutation) {
-          const confirmId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          sse.send({ type: "confirm", id: confirmId, toolName: use.name, input: use.input });
-          const approved = await confirmations.await(confirmId);
-          if (!approved) {
-            toolResults.push({
-              type: "tool_result",
-              tool_use_id: use.id,
-              content: "User declined the tool invocation.",
-              is_error: true,
-            });
-            continue;
-          }
-        }
-
         try {
           const result = await mcp.callTool({
             name: use.name,
