@@ -66,7 +66,17 @@ ONLY when the user is changing EXACTLY ONE thing.
 
 When you call update_calendar, ALWAYS show the user the diff summary
 from its response BEFORE calling apply_calendar_update — they need to
-review what will change.`;
+review what will change.
+
+DEPLOY LAG: after ANY successful write (apply_calendar_update succeeded,
+or a direct set_result/add_event/update_event/remove_event/create_calendar
+returned without error), the change is COMMITTED to GitHub immediately
+but the live page at cal.kurtays.com/<calendar>.html takes about 2
+minutes to reflect it. A GitHub Actions workflow builds the static site
+and pushes to S3+CloudFront. Always remind the user at the end of a
+successful write: something like "Committed — should appear on
+cal.kurtays.com in about 2 minutes." This sets expectations so they
+don't immediately refresh the page and think the change was lost.`;
 // Roll the per-user conversation history at this many messages. ~15
 // user turns assuming each turn writes one user + one assistant
 // message (plus any tool_result/tool_use pairs Claude appends). Keeps
