@@ -8,7 +8,8 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "build:lambda": "pnpm --filter @calendar-bot/chat-lambda build"
+    "build:lambda": "pnpm --filter @calendar-bot/chat-lambda build",
+    "claude:desktop": "pnpm --filter @calendar-bot/server build && node scripts/claude-desktop-setup.mjs"
   },
   "packageManager": "pnpm@11.1.2",
   "engines": {

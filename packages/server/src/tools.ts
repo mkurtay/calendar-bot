@@ -81,6 +81,23 @@ export async function listEvents(store: CalendarStore, p: ListEventsParams) {
   return { calendar_id: calendar.id, count: events.length, events };
 }
 
+export interface ReadCalendarParams {
+  calendar_id: string;
+}
+
+/**
+ * Return the full calendar object — metadata (name, category, type),
+ * teams (for soccer), and the complete events array. Use when the
+ * caller needs the whole picture before composing an update_calendar
+ * call (mapping fetched data to existing UIDs, checking the teams
+ * registry, etc.). Distinguish from list_events (events only) and
+ * list_calendars (just a summary of every calendar in the repo).
+ */
+export async function readCalendar(store: CalendarStore, p: ReadCalendarParams) {
+  const { calendar, path } = await store.getCalendar(p.calendar_id);
+  return { path, calendar };
+}
+
 export async function addEvent(store: CalendarStore, p: AddEventParams) {
   const { calendar, sha } = await store.getCalendar(p.calendar_id);
   const uid = p.uid ?? `${calendar.id}-${randomUUID().slice(0, 8)}`;
