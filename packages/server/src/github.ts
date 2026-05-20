@@ -106,4 +106,57 @@ export class GitHub {
       throw err;
     }
   }
+
+  /**
+   * List recent commits that touched `path`, newest first. Used by the
+   * revert flow to find the most-recent change to a calendar JSON.
+   */
+  async listCommitsForPath(
+    path: string,
+    limit: number = 10,
+  ): Promise<
+    Array<{
+      sha: string;
+      message: string;
+      authorDate: string | undefined;
+      authorName: string | undefined;
+    }>
+  > {
+    const res = await this.octokit.repos.listCommits({
+      owner: this.config.owner,
+      repo: this.config.repo,
+      sha: this.config.branch,
+      path,
+      per_page: limit,
+    });
+    return res.data.map((c) => ({
+      sha: c.sha,
+      message: c.commit.message,
+      authorDate: c.commit.author?.date,
+      authorName: c.commit.author?.name ?? undefined,
+    }));
+  }
+
+  /**
+   * Read a file at a specific commit ref (not necessarily HEAD). The
+   * revert flow uses this to fetch the file as it was BEFORE the
+   * most recent change, then writes that content back as a new commit
+   * (content-equivalent revert without a git merge).
+   */
+  async getFileAtRef(
+    path: string,
+    ref: string,
+  ): Promise<{ content: string }> {
+    const res = await this.octokit.repos.getContent({
+      owner: this.config.owner,
+      repo: this.config.repo,
+      ref,
+      path,
+    });
+    if (Array.isArray(res.data) || res.data.type !== "file") {
+      throw new Error(`Path at ${ref} is not a file: ${path}`);
+    }
+    const content = Buffer.from(res.data.content, "base64").toString("utf8");
+    return { content };
+  }
 }

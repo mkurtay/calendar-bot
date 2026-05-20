@@ -41,6 +41,14 @@ import {
   fetchCompetitionScorers,
   type FetchCompetitionScorersParams,
 } from "./tools/football-data.js";
+import {
+  PROPOSE_REVERT_TOOL,
+  proposeRevert,
+  type ProposeRevertParams,
+  APPLY_REVERT_TOOL,
+  applyRevert,
+  type ApplyRevertParams,
+} from "./tools/revert.js";
 import { ConfigError, loadConfig } from "./config.js";
 
 const TOOL_DEFINITIONS = [
@@ -78,6 +86,23 @@ const TOOL_DEFINITIONS = [
           type: "string",
           description:
             "Optional ISO-8601 UTC upper bound on event.end (e.g. '2026-06-01T00:00:00Z').",
+        },
+      },
+      required: ["calendar_id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "read_calendar",
+    description:
+      "Return the complete calendar object for one id — metadata (name, category, type, presentation), teams (for soccer), and the full events array. Use when you need the whole picture before composing changes (mapping fetched data to existing UIDs, checking the teams registry, confirming what's already there). Heavier than list_events; prefer list_events when you only need event filtering.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        calendar_id: {
+          type: "string",
+          description:
+            "Calendar id slug, e.g. 'champions-league-2026', 'world-cup-2026'.",
         },
       },
       required: ["calendar_id"],
@@ -193,9 +218,11 @@ const TOOL_DEFINITIONS = [
   FETCH_COMPETITION_STANDINGS_TOOL,
   FETCH_TEAM_FIXTURES_TOOL,
   FETCH_COMPETITION_SCORERS_TOOL,
+  PROPOSE_REVERT_TOOL,
+  APPLY_REVERT_TOOL,
 ];
 
-function createServer(store: CalendarStore): McpServer {
+function createServer(store: CalendarStore, gh: GitHub): McpServer {
   const mcp = new McpServer(
     { name: "calendar-bot", version: "0.1.0" },
     { capabilities: { tools: {} } },
@@ -208,7 +235,7 @@ function createServer(store: CalendarStore): McpServer {
   mcp.server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     try {
-      const result = await dispatch(name, args ?? {}, store);
+      const result = await dispatch(name, args ?? {}, store, gh);
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
@@ -228,6 +255,7 @@ async function dispatch(
   name: string,
   args: Record<string, unknown>,
   store: CalendarStore,
+  gh: GitHub,
 ): Promise<unknown> {
   switch (name) {
     case "create_calendar":
@@ -243,6 +271,8 @@ async function dispatch(
       return tools.listCalendars(store);
     case "list_events":
       return tools.listEvents(store, args as unknown as tools.ListEventsParams);
+    case "read_calendar":
+      return tools.readCalendar(store, args as unknown as tools.ReadCalendarParams);
     case "add_event":
       return tools.addEvent(store, args as unknown as tools.AddEventParams);
     case "update_event":
@@ -263,6 +293,10 @@ async function dispatch(
       return fetchCompetitionScorers(
         args as unknown as FetchCompetitionScorersParams,
       );
+    case "propose_revert":
+      return proposeRevert(store, gh, args as unknown as ProposeRevertParams);
+    case "apply_revert":
+      return applyRevert(gh, args as unknown as ApplyRevertParams);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -272,7 +306,7 @@ async function main() {
   const config = loadConfig();
   const gh = new GitHub(config.github);
   const store = new CalendarStore(gh);
-  const mcp = createServer(store);
+  const mcp = createServer(store, gh);
   const transport = new StdioServerTransport();
   await mcp.connect(transport);
 }
