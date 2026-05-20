@@ -1,0 +1,55 @@
+name: Auto-update results
+
+# Every 6 hours, pull finished match results from football-data.org and
+# commit them to the calendar JSON in mkurtay/cal. Result-only — never
+# adds events or changes structure. See packages/server/src/auto-update.
+#
+# Self-documenting via commit messages ("auto: result ..."); no other
+# notification channel. Structural changes stay manual (via the chat).
+#
+# No untrusted input is used anywhere in this workflow: the only trigger
+# is a schedule (no event payload), and all run: inputs come from
+# repository secrets + static literals.
+
+on:
+  schedule:
+    # Every 6 hours at :15 past (avoid the top-of-hour cron stampede).
+    - cron: "15 */6 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: auto-update
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run auto-updater
+        env:
+          # PAT with Contents: Read and write on mkurtay/cal. The
+          # auto-updater commits result changes directly to main.
+          GH_TOKEN: ${{ secrets.CALENDAR_WRITE_TOKEN }}
+          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+          GITHUB_OWNER: mkurtay
+          GITHUB_REPO: cal
+          GITHUB_BRANCH: main
+        run: pnpm --filter @calendar-bot/server exec tsx src/auto-update/cli.ts
