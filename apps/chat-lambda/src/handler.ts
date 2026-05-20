@@ -95,7 +95,10 @@ async function handleCalendarRequest(
     }
     const ghToken = process.env.GH_TOKEN;
     const owner = process.env.GITHUB_OWNER ?? "mkurtay";
-    const repo = process.env.GITHUB_REPO ?? "cal";
+    // Requests go to a DEDICATED PUBLIC repo (not the private calendar
+    // repo) so external folks can view/upvote/subscribe to the issues.
+    // Override via REQUESTS_REPO if ever renamed.
+    const repo = process.env.REQUESTS_REPO ?? "cal-requests";
     if (!ghToken) {
       writeJson(stream, 500, { error: "Server missing credentials" });
       return;
